@@ -1,5 +1,5 @@
-# Better Blur
-Better Blur is a fork of the Plasma 6 blur effect with additional features and bug fixes.
+# KDE Blur
+KDE Blur is a fork of [Better Blur](https://github.com/taj-ny/kwin-effects-forceblur), itself a fork of the Plasma 6 blur effect, with additional features.
 
 ![image](https://github.com/user-attachments/assets/f8a7c618-89b4-485a-b0f8-29dd5f77e3ca)
 
