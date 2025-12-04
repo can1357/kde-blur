@@ -10,6 +10,10 @@ Better Blur is a fork of the Plasma 6 blur effect with additional features and b
 - Static blur for much lower GPU usage
 - Adjust blur brightness, contrast and saturation
 - Refraction (by [@DaddelZeit](https://github.com/DaddelZeit) and [@iGerman00](https://github.com/iGerman00))
+- Inactive window translucency with animated transitions
+- Custom window class/name exclusions
+- Configurable opacity during move/resize operations
+- Plasma widget blur support
 
 ### Bug fixes
 Fixes for blur-related Plasma bugs that haven't been patched yet.
@@ -161,8 +165,8 @@ Latest Better Blur versions for previous Plasma releases:
 
 ### Building
 ```sh
-git clone https://github.com/taj-ny/kwin-effects-forceblur
-cd kwin-effects-forceblur
+git clone https://github.com/can1357/kde-blur
+cd kde-blur
 mkdir build
 cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr
@@ -176,15 +180,15 @@ sudo make install
 
   ```sh
   # enter container
-  git clone https://github.com/taj-ny/kwin-effects-forceblur
-  cd kwin-effects-forceblur
+  git clone https://github.com/can1357/kde-blur
+  cd kde-blur
   mkdir build
   cd build
   cmake .. -DCMAKE_INSTALL_PREFIX=/usr
   make -j$(nproc)
   cpack -V -G RPM
   exit # exit container
-  sudo rpm-ostree install kwin-effects-forceblur/build/kwin-better-blur.rpm
+  sudo rpm-ostree install kde-blur/build/kwin-better-blur.rpm
   ```
 </details>
 
