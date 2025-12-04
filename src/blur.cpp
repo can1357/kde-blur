@@ -463,10 +463,11 @@ bool BlurEffect::isExcludedFromTranslucency(const EffectWindow *w) const
     if (!w) {
         return true;
     }
-    return w->isDesktop()
-        || w->isDock()
-        || w->isPopupWindow()
-        || w->isPopupMenu();
+    if (w->isDesktop() || w->isDock() || w->isPopupWindow() || w->isPopupMenu()) {
+        return true;
+    }
+    return m_settings.inactive.excludedClasses.contains(w->window()->resourceClass())
+        || m_settings.inactive.excludedClasses.contains(w->window()->resourceName());
 }
 
 void BlurEffect::slotScreenAdded(KWin::Output *screen)
@@ -783,6 +784,12 @@ void BlurEffect::drawWindow(const RenderTarget &renderTarget, const RenderViewpo
                 data.setOpacity(data.opacity() * blurInfo.windowOpacity);
             }
         }
+    }
+
+    // Apply move/resize opacity
+    if (m_settings.inactive.windowTranslucency && w && (w->isUserMove() || w->isUserResize())) {
+        float moveResizeOpacity = m_settings.inactive.moveResizeOpacity / 100.0f;
+        data.setOpacity(data.opacity() * moveResizeOpacity);
     }
 
     // Draw the window over the blurred area
