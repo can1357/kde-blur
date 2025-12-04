@@ -367,6 +367,7 @@ void BlurEffect::slotWindowAdded(EffectWindow *w)
         }
 
         updateBlurRegion(w, true);
+        effects->addRepaint(w->frameGeometry().toAlignedRect());
     });
 
     if (auto internal = w->internalWindow()) {
@@ -728,7 +729,7 @@ bool BlurEffect::shouldBlur(const EffectWindow *w, int mask, const WindowPaintDa
         return false;
     }
 
-    bool scaled = !qFuzzyCompare(data.xScale(), 1.0) && !qFuzzyCompare(data.yScale(), 1.0);
+    bool scaled = !qFuzzyCompare(data.xScale(), 1.0) || !qFuzzyCompare(data.yScale(), 1.0);
     bool translated = data.xTranslation() || data.yTranslation();
     if (!(scaled || (translated || (mask & PAINT_WINDOW_TRANSFORMED)))) {
         if (m_blurWhenTransformed.contains(w)) {
@@ -1427,7 +1428,7 @@ bool BlurEffect::isActive() const
 
 bool BlurEffect::blocksDirectScanout() const
 {
-    return false;
+    return m_valid;
 }
 
 } // namespace KWin
