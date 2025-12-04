@@ -53,13 +53,7 @@ find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
     Config
     ConfigWidgets
     CoreAddons
-    Crash
-    GlobalAccel
     I18n
-    KIO
-    Service
-    #Init
-    Notifications
     Service
     WidgetsAddons
     WindowSystem

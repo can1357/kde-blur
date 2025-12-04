@@ -123,6 +123,8 @@ BlurEffect::BlurEffect()
     initBlurStrengthValues();
     reconfigure(ReconfigureAll);
 
+    m_activeWindow = effects->activeWindow();
+
     if (effects->xcbConnection()) {
         net_wm_blur_region = effects->announceSupportProperty(s_blurAtomName, this);
     }
@@ -144,6 +146,7 @@ BlurEffect::BlurEffect()
 
     connect(effects, &EffectsHandler::windowAdded, this, &BlurEffect::slotWindowAdded);
     connect(effects, &EffectsHandler::windowDeleted, this, &BlurEffect::slotWindowDeleted);
+    connect(effects, &EffectsHandler::windowActivated, this, &BlurEffect::slotWindowActivated);
     connect(effects, &EffectsHandler::screenAdded, this, &BlurEffect::slotScreenAdded);
     connect(effects, &EffectsHandler::screenRemoved, this, &BlurEffect::slotScreenRemoved);
     connect(effects, &EffectsHandler::propertyNotify, this, &BlurEffect::slotPropertyNotify);
@@ -301,12 +304,24 @@ void BlurEffect::updateBlurRegion(EffectWindow *w, bool geometryChanged)
         }
     }
 
-    if (content.has_value() || frame.has_value()) {
+    bool hasBlurRegion = content.has_value() || frame.has_value();
+    bool needsTranslucencyTracking = m_settings.inactive.windowTranslucency
+        && !isExcludedFromTranslucency(w);
+
+    if (hasBlurRegion || needsTranslucencyTracking) {
+        bool isNew = m_windows.find(w) == m_windows.end();
         BlurEffectData &data = m_windows[w];
         data.content = content;
         data.frame = frame;
-        data.windowEffect = ItemEffect(w->windowItem());
-    } else if (!geometryChanged) { // Blur may disappear if this method is called when window geometry changes
+        if (hasBlurRegion) {
+            data.windowEffect = ItemEffect(w->windowItem());
+        }
+
+        if (isNew) {
+            data.opacityTimeline.setDuration(std::chrono::milliseconds(m_settings.inactive.animationDuration));
+            data.opacityTimeline.setEasingCurve(QEasingCurve::InOutCubic);
+        }
+    } else if (!geometryChanged) {
         if (auto it = m_windows.find(w); it != m_windows.end()) {
             effects->makeOpenGLContextCurrent();
             m_windows.erase(it);
@@ -363,6 +378,17 @@ void BlurEffect::slotWindowAdded(EffectWindow *w)
 
     updateBlurRegion(w);
 
+    // New inactive windows start at target opacity (no animation)
+    if (m_settings.inactive.windowTranslucency && w != effects->activeWindow() && !isExcludedFromTranslucency(w)) {
+        if (auto it = m_windows.find(w); it != m_windows.end()) {
+            float targetOpacity = m_settings.inactive.windowOpacity / 100.0f;
+            it->second.windowOpacity = targetOpacity;
+            it->second.opacityAnimationStart = targetOpacity;
+            it->second.opacityAnimationTarget = targetOpacity;
+            it->second.hasInactiveAnimation = true;
+        }
+    }
+
     m_allWindows.push_back(w);
 }
 
@@ -387,6 +413,60 @@ void BlurEffect::slotWindowDeleted(EffectWindow *w)
     if (m_blurWhenTransformed.contains(w)) {
         m_blurWhenTransformed.removeOne(w);
     }
+}
+
+void BlurEffect::slotWindowActivated(EffectWindow *w)
+{
+    if (!m_settings.inactive.windowTranslucency) {
+        return;
+    }
+
+    EffectWindow *prevActive = m_activeWindow;
+    m_activeWindow = w;
+
+    // 1. Make previous window inactive (animate TO target opacity)
+    if (prevActive && prevActive != w) {
+        startInactiveAnimation(prevActive);
+    }
+
+    // 2. Revert new window's inactive animation (animate FROM current TO 1.0)
+    if (w) {
+        if (auto it = m_windows.find(w); it != m_windows.end()) {
+            if (it->second.hasInactiveAnimation) {
+                it->second.opacityAnimationStart = it->second.windowOpacity;
+                it->second.opacityAnimationTarget = 1.0f;
+                it->second.opacityTimeline.reset();
+                it->second.hasInactiveAnimation = false;
+                effects->addRepaint(w->frameGeometry().toAlignedRect());
+            }
+        }
+    }
+}
+
+void BlurEffect::startInactiveAnimation(EffectWindow *w)
+{
+    if (isExcludedFromTranslucency(w)) {
+        return;
+    }
+
+    if (auto it = m_windows.find(w); it != m_windows.end()) {
+        it->second.opacityAnimationStart = it->second.windowOpacity;
+        it->second.opacityAnimationTarget = m_settings.inactive.windowOpacity / 100.0f;
+        it->second.opacityTimeline.reset();
+        it->second.hasInactiveAnimation = true;
+        effects->addRepaint(w->frameGeometry().toAlignedRect());
+    }
+}
+
+bool BlurEffect::isExcludedFromTranslucency(const EffectWindow *w) const
+{
+    if (!w) {
+        return true;
+    }
+    return w->isDesktop()
+        || w->isDock()
+        || w->isPopupWindow()
+        || w->isPopupMenu();
 }
 
 void BlurEffect::slotScreenAdded(KWin::Output *screen)
@@ -616,6 +696,26 @@ void BlurEffect::prePaintWindow(EffectWindow *w, WindowPrePaintData &data, std::
         }
     }
 
+    // Window opacity animation
+    if (m_settings.inactive.windowTranslucency && !isExcludedFromTranslucency(w)) {
+        if (auto it = m_windows.find(w); it != m_windows.end()) {
+            it->second.opacityTimeline.advance(presentTime);
+            float t = it->second.opacityTimeline.value();
+
+            float start = it->second.opacityAnimationStart;
+            float target = it->second.opacityAnimationTarget;
+            it->second.windowOpacity = start + (target - start) * t;
+
+            if (it->second.windowOpacity < 1.0f) {
+                data.mask |= Effect::PAINT_WINDOW_TRANSLUCENT;
+            }
+
+            if (!it->second.opacityTimeline.done()) {
+                effects->addRepaint(w->frameGeometry().toAlignedRect());
+            }
+        }
+    }
+
     m_paintedArea -= data.opaque;
     m_paintedArea += data.paint;
 }
@@ -675,6 +775,13 @@ void BlurEffect::drawWindow(const RenderTarget &renderTarget, const RenderViewpo
         BlurRenderData &renderInfo = blurInfo.render[m_currentScreen];
         if (shouldBlur(w, mask, data)) {
             blur(renderInfo, renderTarget, viewport, w, mask, region, data);
+        }
+
+        // Apply window opacity animation
+        if (m_settings.inactive.windowTranslucency && !isExcludedFromTranslucency(w)) {
+            if (blurInfo.windowOpacity < 1.0f) {
+                data.setOpacity(data.opacity() * blurInfo.windowOpacity);
+            }
         }
     }
 

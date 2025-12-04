@@ -1,5 +1,7 @@
 #pragma once
 
+#include "window.h"
+
 namespace KWin
 {
 
@@ -14,6 +16,11 @@ inline bool isDockFloating(const EffectWindow *dock, const QRegion blurRegion)
     // the blur region, the dock is most likely floating. The (0,0) pixel may be outside the blur region if the dock
     // can float but isn't at the moment.
     return !blurRegion.intersects(QRect(0, dock->height() / 2, 1, 1)) && !blurRegion.intersects(QRect(dock->width() / 2, 0, 1, 1));
+}
+
+inline bool isPlasmaWidget(const EffectWindow *w)
+{
+    return w->window()->resourceClass() == QStringLiteral("plasmashell") && !w->isDock() && !w->isDesktop();
 }
 
 }

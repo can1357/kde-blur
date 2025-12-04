@@ -29,6 +29,7 @@ if(BETTERBLUR_WAYLAND)
         KDecoration3::KDecoration
         KF6::ConfigGui
         KWin::kwin
+        XCB::XCB
     )
     install(TARGETS forceblur DESTINATION ${KDE_INSTALL_PLUGINDIR}/kwin/effects/plugins)
 endif()

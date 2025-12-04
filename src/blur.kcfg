@@ -52,6 +52,30 @@ class3</default>
         <entry name="BlurDocks" type="Bool">
             <default>false</default>
         </entry>
+        <entry name="BlurPlasmaWidgets" type="Bool">
+            <default>false</default>
+        </entry>
+        <entry name="InactiveBlur" type="Bool">
+            <default>false</default>
+        </entry>
+        <entry name="InactiveBlurStrengthMultiplier" type="Double">
+            <default>0.5</default>
+        </entry>
+        <entry name="InactiveBrightnessMultiplier" type="Double">
+            <default>1.0</default>
+        </entry>
+        <entry name="InactiveSaturationMultiplier" type="Double">
+            <default>1.0</default>
+        </entry>
+        <entry name="InactiveContrastMultiplier" type="Double">
+            <default>1.0</default>
+        </entry>
+        <entry name="InactiveOpacityMultiplier" type="Double">
+            <default>1.0</default>
+        </entry>
+        <entry name="InactiveAnimationDuration" type="Int">
+            <default>200</default>
+        </entry>
         <entry name="FakeBlur" type="Bool">
             <default>false</default>
         </entry>
@@ -79,6 +103,9 @@ class3</default>
         <entry name="Contrast" type="Double">
             <default>1.0</default>
         </entry>
+        <entry name="BlurOpacity" type="Int">
+            <default>100</default>
+        </entry>
         <entry name="RefractionNormalPow" type="Double">
             <default>2.0</default>
         </entry>
@@ -93,6 +120,18 @@ class3</default>
         </entry>
         <entry name="RefractionTextureRepeatMode" type="Int">
             <default>0</default>
+        </entry>
+        <entry name="InactiveWindowTranslucency" type="Bool">
+            <default>false</default>
+        </entry>
+        <entry name="InactiveWindowOpacity" type="Int">
+            <default>90</default>
+        </entry>
+        <entry name="InactiveMoveResizeOpacity" type="Int">
+            <default>80</default>
+        </entry>
+        <entry name="InactiveExcludedClasses" type="String">
+            <default></default>
         </entry>
     </group>
 </kcfg>

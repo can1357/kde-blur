@@ -8,6 +8,7 @@
 #pragma once
 
 #include "effect/effect.h"
+#include "effect/timeline.h"
 #include "opengl/glutils.h"
 #include "scene/item.h"
 
@@ -46,6 +47,13 @@ struct BlurEffectData
     ItemEffect windowEffect;
 
     bool hasWindowBehind;
+
+    // Window opacity animation (mimics old.js translucency effect)
+    float windowOpacity = 1.0f;           // Current rendered opacity
+    float opacityAnimationStart = 1.0f;   // Opacity when animation started
+    float opacityAnimationTarget = 1.0f;  // Target opacity to animate toward
+    TimeLine opacityTimeline;             // Always Forward 0→1, lerp between start/target
+    bool hasInactiveAnimation = false;    // True if window is "held" at inactive opacity
 };
 
 class BlurEffect : public KWin::Effect
@@ -79,6 +87,7 @@ public:
 public Q_SLOTS:
     void slotWindowAdded(KWin::EffectWindow *w);
     void slotWindowDeleted(KWin::EffectWindow *w);
+    void slotWindowActivated(KWin::EffectWindow *w);
     void slotScreenAdded(KWin::Output *screen);
     void slotScreenRemoved(KWin::Output *screen);
     void slotPropertyNotify(KWin::EffectWindow *w, long atom);
@@ -94,6 +103,10 @@ private:
     void updateBlurRegion(EffectWindow *w, bool geometryChanged = false);
     bool hasStaticBlur(EffectWindow *w);
     QMatrix4x4 colorMatrix(const float &brightness, const float &saturation, const float &contrast) const;
+
+    // Window opacity animation helpers
+    void startInactiveAnimation(EffectWindow *w);
+    bool isExcludedFromTranslucency(const EffectWindow *w) const;
 
     /*
      * @param w The pointer to the window being blurred, nullptr if an image is being blurred.
@@ -232,6 +245,8 @@ private:
      * BlurEffect::prePaintWindow is running, so that can't be used.
      */
     std::vector<EffectWindow *> m_allWindows;
+
+    EffectWindow *m_activeWindow = nullptr;
 
     static BlurManagerInterface *s_blurManager;
     static QTimer *s_blurManagerRemoveTimer;

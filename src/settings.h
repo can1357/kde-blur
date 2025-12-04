@@ -27,6 +27,22 @@ struct GeneralSettings
     float brightness;
     float saturation;
     float contrast;
+    int blurOpacity;
+};
+
+struct InactiveSettings
+{
+    bool enable;
+    float blurStrengthMultiplier;
+    float brightnessMultiplier;
+    float saturationMultiplier;
+    float contrastMultiplier;
+    float opacityMultiplier;
+    int animationDuration;
+    bool windowTranslucency;
+    int windowOpacity;
+    int moveResizeOpacity;
+    QStringList excludedClasses;
 };
 
 struct ForceBlurSettings
@@ -36,6 +52,7 @@ struct ForceBlurSettings
     bool blurDecorations;
     bool blurMenus;
     bool blurDocks;
+    bool blurPlasmaWidgets;
 };
 
 struct RoundedCornersSettings
@@ -70,6 +87,7 @@ class BlurSettings
 {
 public:
     GeneralSettings general{};
+    InactiveSettings inactive{};
     ForceBlurSettings forceBlur{};
     RoundedCornersSettings roundedCorners{};
     StaticBlurSettings staticBlur{};
