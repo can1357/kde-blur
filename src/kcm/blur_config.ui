@@ -1338,12 +1338,36 @@
          <item>
           <widget class="QLabel">
            <property name="text">
-            <string>Move/resize opacity (%)</string>
+            <string>Move opacity (%)</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QSpinBox" name="kcfg_InactiveMoveResizeOpacity">
+          <widget class="QSpinBox" name="kcfg_InactiveMoveOpacity">
+           <property name="minimum">
+            <number>0</number>
+           </property>
+           <property name="maximum">
+            <number>100</number>
+           </property>
+           <property name="singleStep">
+            <number>5</number>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout">
+         <item>
+          <widget class="QLabel">
+           <property name="text">
+            <string>Resize opacity (%)</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="kcfg_InactiveResizeOpacity">
            <property name="minimum">
             <number>0</number>
            </property>

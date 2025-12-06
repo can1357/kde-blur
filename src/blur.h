@@ -88,6 +88,7 @@ public Q_SLOTS:
     void slotWindowAdded(KWin::EffectWindow *w);
     void slotWindowDeleted(KWin::EffectWindow *w);
     void slotWindowActivated(KWin::EffectWindow *w);
+    void slotWindowFinishUserMovedResized(KWin::EffectWindow *w);
     void slotScreenAdded(KWin::Output *screen);
     void slotScreenRemoved(KWin::Output *screen);
     void slotPropertyNotify(KWin::EffectWindow *w, long atom);

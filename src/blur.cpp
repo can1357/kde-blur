@@ -32,7 +32,8 @@
 #include <QTime>
 #include <QTimer>
 #include <QWindow>
-#include <cmath> // for ceil()
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 #include <KConfigGroup>
@@ -375,6 +376,7 @@ void BlurEffect::slotWindowAdded(EffectWindow *w)
     }
 
     connect(w, &EffectWindow::windowDecorationChanged, this, &BlurEffect::setupDecorationConnections);
+    connect(w, &EffectWindow::windowFinishUserMovedResized, this, &BlurEffect::slotWindowFinishUserMovedResized);
     setupDecorationConnections(w);
 
     updateBlurRegion(w);
@@ -430,15 +432,27 @@ void BlurEffect::slotWindowActivated(EffectWindow *w)
         startInactiveAnimation(prevActive);
     }
 
-    // 2. Revert new window's inactive animation (animate FROM current TO 1.0)
+    // 2. Revert inactive state (animate FROM current TO 1.0)
     if (w) {
         if (auto it = m_windows.find(w); it != m_windows.end()) {
-            if (it->second.hasInactiveAnimation) {
+            constexpr float opacityEpsilon = 0.01f;
+            bool opacityNeedsFix = it->second.windowOpacity < (1.0f - opacityEpsilon);
+            bool needsAnimation = it->second.hasInactiveAnimation || opacityNeedsFix;
+            bool alreadyAnimatingToFull = !it->second.hasInactiveAnimation
+                && it->second.opacityAnimationTarget == 1.0f
+                && !it->second.opacityTimeline.done();
+
+            if (needsAnimation && !alreadyAnimatingToFull) {
                 it->second.opacityAnimationStart = it->second.windowOpacity;
                 it->second.opacityAnimationTarget = 1.0f;
                 it->second.opacityTimeline.reset();
                 it->second.hasInactiveAnimation = false;
                 effects->addRepaint(w->frameGeometry().toAlignedRect());
+            } else if (!needsAnimation && it->second.windowOpacity >= (1.0f - opacityEpsilon)) {
+                // Snap to 1.0 if very close, to prevent drift-triggered re-animations
+                it->second.windowOpacity = 1.0f;
+                it->second.opacityAnimationStart = 1.0f;
+                it->second.opacityAnimationTarget = 1.0f;
             }
         }
     }
@@ -469,6 +483,26 @@ bool BlurEffect::isExcludedFromTranslucency(const EffectWindow *w) const
     }
     return m_settings.inactive.excludedClasses.contains(w->window()->resourceClass())
         || m_settings.inactive.excludedClasses.contains(w->window()->resourceName());
+}
+
+void BlurEffect::slotWindowFinishUserMovedResized(EffectWindow *w)
+{
+    if (!m_settings.inactive.windowTranslucency || !w) {
+        return;
+    }
+
+    if (w == m_activeWindow) {
+        if (auto it = m_windows.find(w); it != m_windows.end()) {
+            it->second.windowOpacity = 1.0f;
+            it->second.opacityAnimationStart = 1.0f;
+            it->second.opacityAnimationTarget = 1.0f;
+            it->second.hasInactiveAnimation = false;
+            // Mark timeline as complete to prevent any pending animation
+            it->second.opacityTimeline.setElapsed(it->second.opacityTimeline.duration());
+        }
+    }
+
+    effects->addRepaint(w->frameGeometry().toAlignedRect());
 }
 
 void BlurEffect::slotScreenAdded(KWin::Output *screen)
@@ -702,18 +736,21 @@ void BlurEffect::prePaintWindow(EffectWindow *w, WindowPrePaintData &data, std::
     if (m_settings.inactive.windowTranslucency && !isExcludedFromTranslucency(w)) {
         if (auto it = m_windows.find(w); it != m_windows.end()) {
             it->second.opacityTimeline.advance(presentTime);
-            float t = it->second.opacityTimeline.value();
 
-            float start = it->second.opacityAnimationStart;
-            float target = it->second.opacityAnimationTarget;
-            it->second.windowOpacity = start + (target - start) * t;
+            if (it->second.opacityTimeline.done()) {
+                // Snap to target when animation completes to prevent floating point drift
+                it->second.windowOpacity = it->second.opacityAnimationTarget;
+                it->second.opacityAnimationStart = it->second.opacityAnimationTarget;
+            } else {
+                float t = it->second.opacityTimeline.value();
+                float start = it->second.opacityAnimationStart;
+                float target = it->second.opacityAnimationTarget;
+                it->second.windowOpacity = std::clamp(start + (target - start) * t, 0.0f, 1.0f);
+                effects->addRepaint(w->frameGeometry().toAlignedRect());
+            }
 
             if (it->second.windowOpacity < 1.0f) {
                 data.mask |= Effect::PAINT_WINDOW_TRANSLUCENT;
-            }
-
-            if (!it->second.opacityTimeline.done()) {
-                effects->addRepaint(w->frameGeometry().toAlignedRect());
             }
         }
     }
@@ -771,12 +808,14 @@ bool BlurEffect::shouldForceBlur(const EffectWindow *w) const
 
 void BlurEffect::drawWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const QRegion &region, WindowPaintData &data)
 {
+    int paintMask = mask;
+
     auto it = m_windows.find(w);
     if (it != m_windows.end()) {
         BlurEffectData &blurInfo = it->second;
         BlurRenderData &renderInfo = blurInfo.render[m_currentScreen];
-        if (shouldBlur(w, mask, data)) {
-            blur(renderInfo, renderTarget, viewport, w, mask, region, data);
+        if (shouldBlur(w, paintMask, data)) {
+            blur(renderInfo, renderTarget, viewport, w, paintMask, region, data);
         }
 
         // Apply window opacity animation
@@ -788,13 +827,23 @@ void BlurEffect::drawWindow(const RenderTarget &renderTarget, const RenderViewpo
     }
 
     // Apply move/resize opacity
-    if (m_settings.inactive.windowTranslucency && w && (w->isUserMove() || w->isUserResize())) {
-        float moveResizeOpacity = m_settings.inactive.moveResizeOpacity / 100.0f;
-        data.setOpacity(data.opacity() * moveResizeOpacity);
+    if (m_settings.inactive.windowTranslucency && w) {
+        const bool moving = w->isUserMove();
+        const bool resizing = w->isUserResize();
+
+        if (moving) {
+            data.setOpacity(data.opacity() * m_settings.inactive.moveOpacity / 100.0f);
+        } else if (resizing) {
+            data.setOpacity(data.opacity() * m_settings.inactive.resizeOpacity / 100.0f);
+        }
+
+        if ((moving || resizing) && data.opacity() < 1.0) {
+            paintMask |= PAINT_WINDOW_TRANSLUCENT;
+        }
     }
 
     // Draw the window over the blurred area
-    effects->drawWindow(renderTarget, viewport, w, mask, region, data);
+    effects->drawWindow(renderTarget, viewport, w, paintMask, region, data);
 }
 
 GLTexture *BlurEffect::ensureStaticBlurTexture(const Output *output, const RenderTarget &renderTarget)

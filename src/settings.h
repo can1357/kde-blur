@@ -41,7 +41,8 @@ struct InactiveSettings
     int animationDuration;
     bool windowTranslucency;
     int windowOpacity;
-    int moveResizeOpacity;
+    int moveOpacity;
+    int resizeOpacity;
     QStringList excludedClasses;
 };
 

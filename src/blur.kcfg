@@ -127,8 +127,11 @@ class3</default>
         <entry name="InactiveWindowOpacity" type="Int">
             <default>90</default>
         </entry>
-        <entry name="InactiveMoveResizeOpacity" type="Int">
+        <entry name="InactiveMoveOpacity" type="Int">
             <default>80</default>
+        </entry>
+        <entry name="InactiveResizeOpacity" type="Int">
+            <default>100</default>
         </entry>
         <entry name="InactiveExcludedClasses" type="String">
             <default></default>

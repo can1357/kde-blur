@@ -25,7 +25,8 @@ void BlurSettings::read()
     inactive.animationDuration = BlurConfig::inactiveAnimationDuration();
     inactive.windowTranslucency = BlurConfig::inactiveWindowTranslucency();
     inactive.windowOpacity = BlurConfig::inactiveWindowOpacity();
-    inactive.moveResizeOpacity = BlurConfig::inactiveMoveResizeOpacity();
+    inactive.moveOpacity = BlurConfig::inactiveMoveOpacity();
+    inactive.resizeOpacity = BlurConfig::inactiveResizeOpacity();
     inactive.excludedClasses.clear();
     for (const auto &line : BlurConfig::inactiveExcludedClasses().split("\n", Qt::SkipEmptyParts)) {
         inactive.excludedClasses << line.trimmed();
